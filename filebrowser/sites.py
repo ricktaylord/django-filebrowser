@@ -550,7 +550,6 @@ class FileBrowserSite(object):
             filedata.name = file_name
             file_path = os.path.join(path, file_name)
             file_already_exists = self.storage.exists(file_path)
-
             # Check for name collision with a directory
             if file_already_exists and self.storage.isdir(file_path):
                 ret_json = {'success': False, 'filename': file_name}
@@ -558,19 +557,25 @@ class FileBrowserSite(object):
 
             signals.filebrowser_pre_upload.send(sender=request, path=folder, file=filedata, site=self)
             uploadedfile = handle_file_upload(path, filedata, site=self)
-
+            local_storage = True
             if file_already_exists and OVERWRITE_EXISTING:
                 old_file = smart_text(file_path)
                 new_file = smart_text(uploadedfile)
                 self.storage.move(new_file, old_file, allow_overwrite=True)
-                full_path = FileObject(smart_text(old_file), site=self).path_full
+                try:
+                    full_path = FileObject(smart_text(old_file), site=self).path_full
+                except NotImplementedError:
+                    local_storage = False
             else:
                 file_name = smart_text(uploadedfile)
                 filedata.name = os.path.relpath(file_name, path)
-                full_path = FileObject(smart_text(file_name), site=self).path_full
+                try:
+                    full_path = FileObject(smart_text(file_name), site=self).path_full
+                except NotImplementedError:
+                    local_storage = False
 
             # set permissions
-            if DEFAULT_PERMISSIONS is not None:
+            if local_storage and DEFAULT_PERMISSIONS is not None:
                 os.chmod(full_path, DEFAULT_PERMISSIONS)
 
             f = FileObject(smart_text(file_name), site=self)
