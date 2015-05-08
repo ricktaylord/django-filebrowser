@@ -494,8 +494,8 @@ class FileBrowserSite(object):
                     else:
                         redirect_url = reverse("filebrowser:fb_browse", current_app=self.name) + query_helper(query, "", "filename")
                     return HttpResponseRedirect(redirect_url)
-                except OSError:
-                    form.errors['name'] = forms.util.ErrorList([_('Error.')])
+                except OSError as e:
+                    form.errors['name'] = forms.util.ErrorList([_(str(e))])
         else:
             form = ChangeForm(initial={"name": fileobject.filename}, path=path, fileobject=fileobject, filebrowser_site=self)
 

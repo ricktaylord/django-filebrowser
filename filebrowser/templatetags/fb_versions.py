@@ -16,7 +16,7 @@ from filebrowser.settings import VERSIONS, PLACEHOLDER, SHOW_PLACEHOLDER, FORCE_
 from filebrowser.base import FileObject
 from filebrowser.sites import get_default_site
 register = Library()
-
+import logging
 
 class VersionNode(Node):
     def __init__(self, src, suffix):
@@ -45,6 +45,7 @@ class VersionNode(Node):
             version = fileobject.version_generate(version_suffix)
             return version.url
         except Exception as e:
+            logging.debug("Version error: %s" % e.message)
             if settings.TEMPLATE_DEBUG:
                 raise e
         return ""

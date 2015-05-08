@@ -2,6 +2,7 @@
 
 # PYTHON IMPORTS
 import os
+import logging
 
 # DJANGO IMPORTS
 from django.http import HttpResponseRedirect
@@ -17,6 +18,10 @@ from filebrowser.templatetags.fb_tags import query_helper
 
 def get_path(path, site=None):
     "Get path."
+    logging.debug(path)
+    logging.debug(site.storage.location)
+    logging.debug(os.path.join(site.directory, path))
+    logging.debug(site.storage.isdir(os.path.join(site.directory, path)))
     if path.startswith('.') or os.path.isabs(path) or not site.storage.isdir(os.path.join(site.directory, path)):
         return None
     return path

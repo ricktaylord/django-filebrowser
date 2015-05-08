@@ -8,6 +8,7 @@ import platform
 import mimetypes
 from tempfile import NamedTemporaryFile
 import warnings
+import logging 
 
 # DJANGO IMPORTS
 from django.core.files import File
@@ -98,7 +99,10 @@ class FileListing():
     def listing(self):
         "List all files for path"
         if self.is_folder:
+            logging.debug("listing")
             dirs, files = self.site.storage.listdir(self.path)
+            logging.debug(dirs)
+            logging.debug(files)
             return (f for f in dirs + files)
         return []
 
@@ -111,6 +115,8 @@ class FileListing():
         ends up in a regression.
         """
         dirs, files = self.site.storage.listdir(path)
+        logging.debug("walk recurse")
+        logging.debug(dirs)
 
         if dirs:
             for d in dirs:
@@ -124,6 +130,7 @@ class FileListing():
     def walk(self):
         "Walk all files for path"
         filelisting = []
+        logging.debug("walk")
         if self.is_folder:
             self._walk(self.path, filelisting)
         return filelisting
@@ -164,6 +171,7 @@ class FileListing():
 
     def files_listing_filtered(self):
         "Returns FileObjects for filtered files in listing"
+        logging.debug("")
         if self.filter_func:
             listing = list(filter(self.filter_func, self.files_listing_total()))
         else:
@@ -228,7 +236,9 @@ class FileObject():
         else:
             self.path = path
         self.head = os.path.dirname(path)
+        logging.debug(self.head)
         self.filename = os.path.basename(path)
+        logging.debug(self.filename)
         self.filename_lower = self.filename.lower()
         self.filename_root, self.extension = os.path.splitext(self.filename)
         self.mimetype = mimetypes.guess_type(self.filename)
@@ -312,6 +322,10 @@ class FileObject():
         "True, if the path exists, False otherwise"
         if self._exists_stored is None:
             self._exists_stored = self.site.storage.exists(self.path)
+        if self._exists_stored:
+            logging.debug("exists: %s" % self.path )
+        else:
+            logging.debug("does not exist: %s" % self.path)
         return self._exists_stored
 
     # PATH/URL ATTRIBUTES/PROPERTIES
@@ -357,10 +371,13 @@ class FileObject():
         if self._dimensions_stored is not None:
             return self._dimensions_stored
         try:
-            im = Image.open(self.site.storage.open(self.path))
-            self._dimensions_stored = im.size
-        except:
-            pass
+            self._dimensions_stored = self.site.storage.dimensions(self.path)
+        except AttributeError:
+            try:
+                im = Image.open(self.site.storage.open(self.path))
+                self._dimensions_stored = im.size
+            except:
+                pass
         return self._dimensions_stored
 
     @property
@@ -418,6 +435,10 @@ class FileObject():
         "True, if path is a folder"
         if self._is_folder_stored is None:
             self._is_folder_stored = self.site.storage.isdir(self.path)
+        if self._is_folder_stored:
+            logging.debug("is folder: %s" % self.path )
+        else:
+            logging.debug("is not folder: %s" % self.path)
         return self._is_folder_stored
 
     @property
@@ -521,6 +542,7 @@ class FileObject():
         try:
             f = self.site.storage.open(self.path)
         except IOError:
+            logging.debug("Generate version fail - cannot open original")
             return ""
         im = Image.open(f)
         version_path = self.version_path(version_suffix)
@@ -545,7 +567,10 @@ class FileObject():
         self.site.storage.save(version_path, tmpfile)
         # set permissions
         if DEFAULT_PERMISSIONS is not None:
-            os.chmod(self.site.storage.path(version_path), DEFAULT_PERMISSIONS)
+            try:
+                os.chmod(self.site.storage.path(version_path), DEFAULT_PERMISSIONS)
+            except:
+                pass
         return version_path
 
     # DELETE METHODS
