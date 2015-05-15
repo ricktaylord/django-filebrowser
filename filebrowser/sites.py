@@ -34,7 +34,7 @@ from filebrowser.templatetags.fb_tags import query_helper
 from filebrowser.base import FileListing, FileObject
 from filebrowser.decorators import path_exists, file_exists
 from filebrowser.storage import FileSystemStorageMixin, StorageMixin
-from filebrowser.utils import convert_filename
+from filebrowser.utils import convert_filename, scale_and_crop
 from filebrowser import signals
 
 # Add some required methods to FileSystemStorage
@@ -215,6 +215,8 @@ class FileBrowserSite(object):
             # for Django version less then 1.4
             from django.conf.urls.defaults import url, patterns
 
+        from filebrowser.crop.views import CropViews
+        crop_views = CropViews(self)
         # filebrowser urls (views)
         urlpatterns = patterns(
             '',
@@ -225,6 +227,7 @@ class FileBrowserSite(object):
             url(r'^delete/$', file_exists(self, path_exists(self, filebrowser_view(self.delete))), name="fb_delete"),
             url(r'^detail/$', file_exists(self, path_exists(self, filebrowser_view(self.detail))), name="fb_detail"),
             url(r'^version/$', file_exists(self, path_exists(self, filebrowser_view(self.version))), name="fb_version"),
+            url(r'^crop/$', file_exists(self, path_exists(self, filebrowser_view(crop_views.main))), name="fb_crop"),
             url(r'^upload_file/$', staff_member_required(csrf_exempt(self._upload_file)), name="fb_do_upload"),
         )
         return urlpatterns
@@ -280,6 +283,9 @@ class FileBrowserSite(object):
     def urls(self):
         "filebrowser.site URLs"
         return self.get_urls(), self.app_name, self.name
+
+
+
 
     def browse(self, request):
         "Browse Files/Directories."
@@ -497,8 +503,8 @@ class FileBrowserSite(object):
                     else:
                         redirect_url = reverse("filebrowser:fb_browse", current_app=self.name) + query_helper(query, "", "filename")
                     return HttpResponseRedirect(redirect_url)
-                except OSError:
-                    form.errors['name'] = forms.util.ErrorList([_('Error.')])
+                except OSError as e:
+                    form.errors['name'] = forms.util.ErrorList([_(str(e))])
         else:
             form = ChangeForm(initial={"name": fileobject.filename}, path=path, fileobject=fileobject, filebrowser_site=self)
 
@@ -573,8 +579,8 @@ class FileBrowserSite(object):
                 full_path = FileObject(smart_text(file_name), site=self).path_full
 
             # set permissions
-            if DEFAULT_PERMISSIONS is not None:
-                os.chmod(full_path, DEFAULT_PERMISSIONS)
+            #if DEFAULT_PERMISSIONS is not None:
+            #    os.chmod(full_path, DEFAULT_PERMISSIONS)
 
             f = FileObject(smart_text(file_name), site=self)
             signals.filebrowser_post_upload.send(sender=request, path=folder, file=f, site=self)
