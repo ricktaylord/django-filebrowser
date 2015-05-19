@@ -6,8 +6,9 @@ from filebrowser.templatetags.fb_tags import query_helper
 from django.template import RequestContext as Context
 from django.contrib import messages
 from django.core.urlresolvers import reverse
-from filebrowser.crop.settings import CROP_PREVIEW_VERSION, CROP_EDIT_VERSION
+from django import forms
 import os
+
 
 class MoveViews(object):
     def __init__(self, site):
@@ -19,7 +20,7 @@ class MoveViews(object):
         from filebrowser.move.forms import MoveForm
         site = self.site
         query = request.GET
-        path = u'%s' % os.path.join(site.directory, query.get('dir', ''))
+        path = os.path.join(site.directory, query.get('dir', ''))
         fileobject = FileObject(os.path.join(path, query.get('filename', '')), site=site) 
         msg = ""
 
@@ -27,14 +28,16 @@ class MoveViews(object):
             form = MoveForm(request.POST)
             if form.is_valid():
                 path = form.cleaned_data['path']
+                destobject = FileObject(os.path.join(site.directory,path,fileobject.filename),site=site)
                 try:
-                    site.storage.move(fileobject.path_relative_directory,os.path.join(path, fileobject.filename))
+                    site.storage.move(fileobject.path,destobject.path)
                     # MESSAGE & REDIRECT
-                    msg = _('The file %s was successfully moved to location %s.') % (original.filename_lower, cropped_path)
+                    msg = _('The file %s was successfully moved to location %s.') % (fileobject.path, destobject.path)
+                    messages.success(request,msg)
                     redirect_url = reverse("filebrowser:fb_browse") + query_helper(query, "", "filename,filetype")
                     return HttpResponseRedirect(redirect_url)
-                except OSError, (errno, strerror):
-                    form.errors['name'] = forms.util.ErrorList([_('Error.')])
+                except OSError as e:
+                    form.errors['path'] = forms.util.ErrorList([_(e.message)])
         else:
             form = MoveForm()
 

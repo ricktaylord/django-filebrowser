@@ -1,6 +1,6 @@
 from django import forms
 class MoveForm(forms.Form):
     """ 
-    Form for 
+    Form for moving files on server
     """
-    path = forms.CharField(widget=forms.TextInput(), label="Server path (no leading slash)")
+    path = forms.CharField(widget=forms.TextInput(), label="Move to folder: uploads/", required=False)
