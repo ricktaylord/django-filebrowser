@@ -4,6 +4,7 @@
 from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
 
+
 # PATH AND URL SETTINGS
 
 # Main Media Settings
@@ -112,3 +113,5 @@ _('Image')
 _('Video')
 _('Document')
 _('Audio')
+
+from filebrowser.crop import *

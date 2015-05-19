@@ -8,6 +8,8 @@ import platform
 import mimetypes
 from tempfile import NamedTemporaryFile
 import warnings
+import logging
+import re
 
 # DJANGO IMPORTS
 from django.core.files import File
@@ -425,6 +427,7 @@ class FileObject():
                 return True
         return False
 
+
     # VERSION ATTRIBUTES/PROPERTIES
     # is_version
     # versions_basedir
@@ -494,10 +497,12 @@ class FileObject():
 
     def version_path(self, version_suffix):
         "Path to a version (relative to storage location)"  # FIXME: version_path for version?
+        logging.debug("version_path")
         return os.path.join(self.versions_basedir, self.dirname, self.version_name(version_suffix))
 
     def version_generate(self, version_suffix):
         "Generate a version"  # FIXME: version_generate for version?
+        logging.debug("version_generate")
         path = self.path
         version_path = self.version_path(version_suffix)
         if not self.site.storage.isfile(version_path):
@@ -506,11 +511,12 @@ class FileObject():
             version_path = self._generate_version(version_suffix)
         return FileObject(version_path, site=self.site)
 
-    def _generate_version(self, version_suffix):
+    def _generate_version(self, version_suffix):    
         """
         Generate Version for an Image.
         value has to be a path relative to the storage location.
         """
+        logging.debug("Generate version "+version_suffix)   
 
         tmpfile = File(NamedTemporaryFile())
 
@@ -539,9 +545,10 @@ class FileObject():
         if version_path != self.site.storage.get_available_name(version_path):
             self.site.storage.delete(version_path)
         self.site.storage.save(version_path, tmpfile)
+        logging.debug(version_path)
         # set permissions
-        if DEFAULT_PERMISSIONS is not None:
-            os.chmod(self.site.storage.path(version_path), DEFAULT_PERMISSIONS)
+        #if DEFAULT_PERMISSIONS is not None:
+        #    os.chmod(self.site.storage.path(version_path), DEFAULT_PERMISSIONS)
         return version_path
 
     # DELETE METHODS

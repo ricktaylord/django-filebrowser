@@ -93,3 +93,7 @@ def scale_and_crop(im, width, height, opts):
     return im
 
 scale_and_crop.valid_options = ('crop', 'upscale')
+
+def crop(im,x,y,w,h):
+    im = im.crop((x,y,x+w,y+h))
+    return im

@@ -1,0 +1,92 @@
+{% extends "admin/base_site.html" %}
+
+<!-- LOADING -->
+{% load admin_static i18n fb_tags fb_versions %}
+{% load url from future %}
+
+<!-- STYLESHEETS -->
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static "css/forms.css" %}" />
+    <link rel="stylesheet" type="text/css" href="{% static "filebrowser/css/filebrowser.css" %}" />
+    <link rel="stylesheet" type="text/css" href="{% static "filebrowser/css/jquery.Jcrop.min.css" %}" />
+{% endblock %}
+
+
+<!-- JAVASCRIPTS -->
+{% block javascripts %}
+     {{ block.super }}
+     <script language="javascript" type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+     <script language="javascript" type="text/javascript" src="{% static "filebrowser/js/FB_FileBrowseField.js" %}"></script>
+     <script language="javascript" type="text/javascript" src="{% static "filebrowser/js/jquery.Jcrop.min.js" %}"></script>
+     <script language="javascript" type="text/javascript">
+     jQuery(window).load(function() {
+        var real_width = {{ uncropped.width }};
+        var real_height = {{ uncropped.height }};
+
+        var resized_width = $('#crop img').width();
+        var resized_height = $('#crop img').height();
+
+        var width_ratio = real_width / resized_width;
+        var height_ratio = real_height / resized_height;
+
+        function update(c) {
+            $('#id_x').val(Math.floor(c.x * width_ratio));
+            $('#id_y').val(Math.floor(c.y * height_ratio));
+            $('#id_w').val(Math.floor(c.w * width_ratio));
+            $('#id_h').val(Math.floor(c.h * height_ratio));
+        }
+
+        var args = {
+            onSelect: update,
+            onChange: update
+        }
+
+        var api = $.Jcrop($('#crop img'), args);
+       
+           
+    });
+    </script>
+    {{ media }}
+{% endblock %}
+
+<!-- COLTYPE/BODYCLASS -->
+{% block bodyclass %}grp-change-form grp-filebrowser{% if query.pop %} grp-popup{% endif %}{% endblock %}
+{% block content-class %}{% endblock %}
+
+<!-- BREADCRBUMBS -->
+{% block breadcrumbs %}{% include "filebrowser/include/breadcrumbs.html" %}{% endblock %}
+
+<!-- CONTENT -->
+{% block content %}
+<div id="grp-content-container">
+    {% if cropped %}
+    <h3>Current cropped image</h3>
+    {{ cropped.filename }}
+    {{ preview_version }}
+    <p><img src="{% version cropped_url preview_version %}" /></p>
+    {% endif %}
+    <h3>Drag to select a new crop</h3>
+    {{ uncropped.path }}
+    {{ edit_version }}
+    <div id="crop">
+        <img src="{% version uncropped.path edit_version %}" />
+    </div>
+    
+    <form action="{% query_string "" "filter_date,filter_type,q,p" %}" method="post">{% csrf_token %}
+
+        {% if form.errors %}<p class="errornote">{% trans 'There was a problem with this crop.' %}</p>{% endif %}
+        
+            {% for field in form %}
+                {% if field.errors %}<ul class="errorlist">{{ field.errors }}</ul>{% endif %}
+                {{ field }}
+            {% endfor %}
+        
+        <div class="submit-row">
+            <input type="submit" value="{% trans 'Do crop' %}" class="default" />
+        </div>
+
+    </form>    
+
+</div>
+{% endblock %}

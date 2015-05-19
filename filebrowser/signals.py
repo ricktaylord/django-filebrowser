@@ -39,3 +39,7 @@ filebrowser_post_rename = Signal(providing_args=["path", "name", "new_name", "si
 # result: The response you defined with your custom action
 filebrowser_actions_pre_apply = Signal(providing_args=['action_name', 'fileobjects', 'site'])
 filebrowser_actions_post_apply = Signal(providing_args=['action_name', 'filebjects', 'result', 'site'])
+
+# crop signals
+filebrowser_pre_crop = Signal(providing_args=["path", "filename", "x", "y", "w", "h"])
+filebrowser_post_crop = Signal(providing_args=["path", "filename", "x", "y", "w", "h"])
