@@ -129,6 +129,7 @@
         <td>
             <ul class="grp-actions">
                 <li class="grp-change-link"><a href="{% url 'filebrowser:fb_detail' %}{% query_string "" "p" %}&amp;filename={{ fileobject.filename|urlencode }}"><strong>{% trans "Change" %}</strong></a></li>
+                <li class="grp-move-link"><a href="{% url 'filebrowser:fb_move' %}{% query_string "" "p" %}&amp;filename={{ fileobject.filename|urlencode }}"><strong>{% trans "Move" %}</strong></a></li>
             </ul>
         </td>
         

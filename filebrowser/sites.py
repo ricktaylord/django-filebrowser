@@ -36,6 +36,7 @@ from filebrowser.decorators import path_exists, file_exists
 from filebrowser.storage import FileSystemStorageMixin, StorageMixin
 from filebrowser.utils import convert_filename
 from filebrowser import signals
+from filebrowser.move.views import MoveViews
 
 # Add some required methods to FileSystemStorage
 if FileSystemStorageMixin not in FileSystemStorage.__bases__:
@@ -206,6 +207,7 @@ class FileBrowserSite(object):
         self._directory = val
 
     directory = property(_directory_get, _directory_set)
+    moveviews = move.MoveViews()
 
     def get_urls(self):
         "URLs for a filebrowser.site"
@@ -214,6 +216,7 @@ class FileBrowserSite(object):
         except ImportError:
             # for Django version less then 1.4
             from django.conf.urls.defaults import url, patterns
+
 
         # filebrowser urls (views)
         urlpatterns = patterns(
@@ -225,6 +228,7 @@ class FileBrowserSite(object):
             url(r'^delete/$', file_exists(self, path_exists(self, filebrowser_view(self.delete))), name="fb_delete"),
             url(r'^detail/$', file_exists(self, path_exists(self, filebrowser_view(self.detail))), name="fb_detail"),
             url(r'^version/$', file_exists(self, path_exists(self, filebrowser_view(self.version))), name="fb_version"),
+            url(r'^move/$', file_exists(self, path_exists(self, filebrowser_view(moveviews.main(site=self)))), name="fb_move"),
             url(r'^upload_file/$', staff_member_required(csrf_exempt(self._upload_file)), name="fb_do_upload"),
         )
         return urlpatterns
