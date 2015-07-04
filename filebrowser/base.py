@@ -12,6 +12,7 @@ import logging
 
 # DJANGO IMPORTS
 from django.core.files import File
+from django.utils.six import string_types
 
 # FILEBROWSER IMPORTS
 from filebrowser.settings import EXTENSIONS, VERSIONS, ADMIN_VERSIONS, VERSIONS_BASEDIR, VERSION_QUALITY, PLACEHOLDER, FORCE_PLACEHOLDER, SHOW_PLACEHOLDER, STRICT_PIL, IMAGE_MAXBLOCK, DEFAULT_PERMISSIONS
@@ -79,15 +80,10 @@ class FileListing():
         Returns:
         the sorted list of objects.
         """
-        import operator
-
-        # Use the "Schwartzian transform"
-        # Create the auxiliary list of tuples where every i-th tuple has form
-        # (seq[i].attr, i, seq[i]) and sort it. The second item of tuple is needed not
-        # only to provide stable sorting, but mainly to eliminate comparison of objects
-        # (which can be expensive or prohibited) in case of equal attribute values.
-        intermed = sorted(zip(map(getattr, seq, (attr,)*len(seq)), range(len(seq)), seq))
-        return list(map(operator.getitem, intermed, (-1,) * len(intermed)))
+        from operator import attrgetter
+        if isinstance(attr, string_types):  # Backward compatibility hack
+            attr = (attr, )
+        return sorted(seq, key=attrgetter(*attr))
 
     _is_folder_stored = None
     @property
@@ -398,7 +394,7 @@ class FileObject():
     def aspectratio(self):
         "Aspect ratio (float format)"
         if self.dimensions:
-            return float(self.width)/float(self.height)
+            return float(self.width) / float(self.height)
         return None
 
     @property
@@ -460,7 +456,7 @@ class FileObject():
     def is_version(self):
         "True if file is a version, false otherwise"
         tmp = self.filename_root.split("_")
-        if tmp[len(tmp)-1] in VERSIONS:
+        if tmp[len(tmp) - 1] in VERSIONS:
             return True
         return False
 
@@ -486,8 +482,8 @@ class FileObject():
     def original_filename(self):
         "Get the filename of an original image from a version"
         tmp = self.filename_root.split("_")
-        if tmp[len(tmp)-1] in VERSIONS:
-            return u"%s%s" % (self.filename_root.replace("_%s" % tmp[len(tmp)-1], ""), self.extension)
+        if tmp[len(tmp) - 1] in VERSIONS:
+            return u"%s%s" % (self.filename_root.replace("_%s" % tmp[len(tmp) - 1], ""), self.extension)
         return self.filename
 
     # VERSION METHODS
