@@ -16,7 +16,7 @@ from django.core.files import File
 from django.utils.six import string_types
 
 # FILEBROWSER IMPORTS
-from filebrowser.settings import EXTENSIONS, VERSIONS, ADMIN_VERSIONS, VERSIONS_BASEDIR, VERSION_QUALITY, PLACEHOLDER, FORCE_PLACEHOLDER, SHOW_PLACEHOLDER, STRICT_PIL, IMAGE_MAXBLOCK, DEFAULT_PERMISSIONS
+from filebrowser.settings import EXTENSIONS, VERSIONS, ADMIN_VERSIONS, ADMIN_THUMBNAIL, VERSIONS_BASEDIR, VERSION_QUALITY, PLACEHOLDER, FORCE_PLACEHOLDER, SHOW_PLACEHOLDER, STRICT_PIL, IMAGE_MAXBLOCK, DEFAULT_PERMISSIONS
 from filebrowser.utils import path_strip, scale_and_crop
 from django.utils.encoding import python_2_unicode_compatible, smart_str
 
@@ -337,6 +337,10 @@ class FileObject():
     @property
     def url(self):
         "URL for the file/folder as defined with site.storage"
+        if self.is_admin_thumbnail:
+            logging.debug("I am a thumbnail: "+self.path)
+            callback = lambda x: self._generate_version(ADMIN_THUMBNAIL) 
+            return self.site.storage.thumbnail_cache_url(self.path,callback)            
         return self.site.storage.url(self.path)
 
     # IMAGE ATTRIBUTES/PROPERTIES
@@ -355,6 +359,9 @@ class FileObject():
         if self._dimensions_stored is not None:
             return self._dimensions_stored
         try:
+            logging.debug("Getting dimensions")
+            self._dimensions_stored = self.site.storage.dimensions(self.path)
+        except AttributeError:
             im = Image.open(self.site.storage.open(self.path))
             self._dimensions_stored = im.size
         except:
@@ -509,13 +516,19 @@ class FileObject():
 
     def version_generate(self, version_suffix):
         "Generate a version"  # FIXME: version_generate for version?
-        logging.debug("version_generate")
         path = self.path
+        if not path:
+            raise IOError("Empty path")
+        logging.debug("Getting version "+version_suffix+" for "+path)
         version_path = self.version_path(version_suffix)
+        logging.debug("Version path is "+version_path)
         if not self.site.storage.isfile(version_path):
+            logging.debug("Version does not exist")
             version_path = self._generate_version(version_suffix)
         elif self.site.storage.modified_time(path) > self.site.storage.modified_time(version_path):
+            logging.debug("Version is stale")
             version_path = self._generate_version(version_suffix)
+        logging.debug("version_acquired: "+version_path)
         return FileObject(version_path, site=self.site)
 
     def _generate_version(self, version_suffix):    
@@ -551,7 +564,7 @@ class FileObject():
         # remove old version, if any
         if version_path != self.site.storage.get_available_name(version_path):
             self.site.storage.delete(version_path)
-        if version==ADMIN_THUMBNAIL:
+        if version_suffix==ADMIN_THUMBNAIL:
             self.site.storage.save(version_path, tmpfile, thumbnail=True)
         else:
             self.site.storage.save(version_path, tmpfile)

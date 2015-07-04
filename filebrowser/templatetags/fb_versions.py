@@ -3,6 +3,7 @@
 # PYTHON IMPORTS
 import os
 import re
+import logging
 from time import gmtime
 
 # DJANGO IMPORTS
@@ -40,11 +41,16 @@ class VersionNode(Node):
         site = context.get('filebrowser_site', get_default_site())
         if FORCE_PLACEHOLDER or (SHOW_PLACEHOLDER and not site.storage.isfile(source)):
             source = PLACEHOLDER
+        logging.debug("Getting file object for "+source)
+        logging.debug(context)
         fileobject = FileObject(source, site=site)
+        logging.debug("Got file object: "+str(fileobject))
         try:
             version = fileobject.version_generate(version_suffix)
+            logging.debug("Returning URL")
             return version.url
         except Exception as e:
+            logging.debug("Generation error "+str(e))
             if settings.TEMPLATE_DEBUG:
                 raise e
         return ""
@@ -89,13 +95,18 @@ class VersionObjectNode(Node):
         site = context.get('filebrowser_site', get_default_site())
         if FORCE_PLACEHOLDER or (SHOW_PLACEHOLDER and not site.storage.isfile(source)):
             source = PLACEHOLDER
+        logging.debug("Getting file object for "+source)
+        logging.debug(context)
         fileobject = FileObject(source, site=site)
+        logging.debug("Got file object: "+str(fileobject))
         try:
             version = fileobject.version_generate(version_suffix)
+            logging.debug("Returning version")
             context[self.var_name] = version
         except Exception as e:
             if settings.TEMPLATE_DEBUG:
                 raise e
+            logging.debug("Generation error "+str(e))
             context[self.var_name] = ""
         return ""
 
