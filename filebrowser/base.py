@@ -443,6 +443,13 @@ class FileObject():
         return False
 
     @property
+    def is_admin_thumbnail(self):
+        tmp = self.filename_root.split("_")
+        if tmp[len(tmp) - 1] == ADMIN_THUMBNAIL:
+            return True
+        return False
+
+    @property
     def versions_basedir(self):
         "Main directory for storing versions (either VERSIONS_BASEDIR or site.directory)"
         if VERSIONS_BASEDIR:
@@ -544,7 +551,10 @@ class FileObject():
         # remove old version, if any
         if version_path != self.site.storage.get_available_name(version_path):
             self.site.storage.delete(version_path)
-        self.site.storage.save(version_path, tmpfile)
+        if version==ADMIN_THUMBNAIL:
+            self.site.storage.save(version_path, tmpfile, thumbnail=True)
+        else:
+            self.site.storage.save(version_path, tmpfile)
         logging.debug(version_path)
         # set permissions
         #if DEFAULT_PERMISSIONS is not None:
