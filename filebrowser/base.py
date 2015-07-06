@@ -14,6 +14,7 @@ import re
 # DJANGO IMPORTS
 from django.core.files import File
 from django.utils.six import string_types
+from django.conf import settings
 
 # FILEBROWSER IMPORTS
 from filebrowser.settings import EXTENSIONS, VERSIONS, ADMIN_VERSIONS, ADMIN_THUMBNAIL, VERSIONS_BASEDIR, VERSION_QUALITY, PLACEHOLDER, FORCE_PLACEHOLDER, SHOW_PLACEHOLDER, STRICT_PIL, IMAGE_MAXBLOCK, DEFAULT_PERMISSIONS
@@ -100,6 +101,14 @@ class FileListing():
             return (f for f in dirs + files)
         return []
 
+    def _if_tag_rel_path(self, path, fle):
+        try:
+            if settings.CACHEDS3_LIST_BY_TAG:
+                return fle
+        except AttributeError:
+            pass
+        return os.path.join(path,d)
+
     def _walk(self, path, filelisting):
         """
         Recursively walks the path and collects all files and
@@ -113,11 +122,11 @@ class FileListing():
         if dirs:
             for d in dirs:
                 self._walk(os.path.join(path, d), filelisting)
-                filelisting.extend([path_strip(os.path.join(path, d), self.site.directory)])
+                filelisting.extend([path_strip(self._if_tag_rel_path(path, d), self.site.directory)])
 
         if files:
             for f in files:
-                filelisting.extend([path_strip(os.path.join(path, f), self.site.directory)])
+                filelisting.extend([path_strip(self._if_tag_rel_path(path, f), self.site.directory)])
 
     def walk(self):
         "Walk all files for path"
@@ -134,7 +143,7 @@ class FileListing():
         if self._fileobjects_total is None:
             self._fileobjects_total = []
             for item in self.listing():
-                fileobject = FileObject(os.path.join(self.path, item), site=self.site)
+                fileobject = FileObject(self._if_tag_rel_path(self.path, item), site=self.site)
                 self._fileobjects_total.append(fileobject)
 
         files = self._fileobjects_total
@@ -359,7 +368,6 @@ class FileObject():
         if self._dimensions_stored is not None:
             return self._dimensions_stored
         try:
-            logging.debug("Getting dimensions")
             self._dimensions_stored = self.site.storage.dimensions(self.path)
         except AttributeError:
             im = Image.open(self.site.storage.open(self.path))
@@ -511,7 +519,6 @@ class FileObject():
 
     def version_path(self, version_suffix):
         "Path to a version (relative to storage location)"  # FIXME: version_path for version?
-        logging.debug("version_path")
         return os.path.join(self.versions_basedir, self.dirname, self.version_name(version_suffix))
 
     def version_generate(self, version_suffix):
@@ -519,16 +526,11 @@ class FileObject():
         path = self.path
         if not path:
             raise IOError("Empty path")
-        logging.debug("Getting version "+version_suffix+" for "+path)
         version_path = self.version_path(version_suffix)
-        logging.debug("Version path is "+version_path)
         if not self.site.storage.isfile(version_path):
-            logging.debug("Version does not exist")
             version_path = self._generate_version(version_suffix)
         elif self.site.storage.modified_time(path) > self.site.storage.modified_time(version_path):
-            logging.debug("Version is stale")
             version_path = self._generate_version(version_suffix)
-        logging.debug("version_acquired: "+version_path)
         return FileObject(version_path, site=self.site)
 
     def _generate_version(self, version_suffix):    
@@ -536,7 +538,6 @@ class FileObject():
         Generate Version for an Image.
         value has to be a path relative to the storage location.
         """
-        logging.debug("Generate version "+version_suffix)   
 
         tmpfile = File(NamedTemporaryFile())
 
@@ -568,7 +569,6 @@ class FileObject():
             self.site.storage.save(version_path, tmpfile, thumbnail=True)
         else:
             self.site.storage.save(version_path, tmpfile)
-        logging.debug(version_path)
         # set permissions
         #if DEFAULT_PERMISSIONS is not None:
         #    os.chmod(self.site.storage.path(version_path), DEFAULT_PERMISSIONS)
