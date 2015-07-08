@@ -267,6 +267,7 @@ qq.FileUploaderBasic = function(o){
         onProgress: function(id, fileName, loaded, total){},
         onComplete: function(id, fileName, responseJSON){},
         onCancel: function(id, fileName){},
+        onAllComplete: function(){},
         // messages                
         messages: {
             typeError: "{file} has invalid extension. Only {extensions} are allowed.",
@@ -335,7 +336,8 @@ qq.FileUploaderBasic.prototype = {
             onCancel: function(id, fileName){
                 self._onCancel(id, fileName);
                 self._options.onCancel(id, fileName);
-            }
+            },
+            onAllComplete: self._options.onAllComplete
         });
 
         return handler;
@@ -860,7 +862,8 @@ qq.UploadHandlerAbstract = function(o){
         maxConnections: 999,
         onProgress: function(id, fileName, loaded, total){},
         onComplete: function(id, fileName, response){},
-        onCancel: function(id, fileName){}
+        onCancel: function(id, fileName){},
+        onAllComplete: function(){}
     };
     qq.extend(this._options, o);    
     
@@ -943,6 +946,9 @@ qq.UploadHandlerAbstract.prototype = {
         if (this._queue.length >= max && i < max){
             var nextId = this._queue[max-1];
             this._upload(nextId, this._params[nextId]);
+        }
+        else {
+            this._queue_complete = true;
         }
     }        
 };
@@ -1214,7 +1220,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
         var size = this.getSize(id);
         
         this._options.onProgress(id, name, size, size);
-                
+        
         if (xhr.status == 200){
             this.log("xhr - server response received");
             this.log("responseText = " + xhr.responseText);
@@ -1235,7 +1241,10 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
                 
         this._files[id] = null;
         this._xhrs[id] = null;    
-        this._dequeue(id);                    
+        this._dequeue(id);
+        if(this._queue.length==0) {
+            this._options.onAllComplete();
+        }              
     },
     _cancel: function(id){
         this._options.onCancel(id, this.getName(id));

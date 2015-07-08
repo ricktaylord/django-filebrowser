@@ -92,6 +92,12 @@
                     if (resp.success) {
                         this.getItem(id).find('.qq-upload-file').html(resp.filename);
                     }
+
+                },
+                onAllComplete: function() {
+                    alert("{{ redirect_url }}");
+                    window.location = "{{ redirect_url }}";
+                    
                 },
                 showMessage: function(message){ alert(message); }
             });
@@ -110,6 +116,7 @@
 <!-- CONTENT -->
 {% block content %}
 <div id="grp-content-container">
+    <h3>Get from local computer</h3>
     <form>
         <fieldset class="grp-module aligned">
         <div class="grp-row" id="file-uploader">
@@ -157,5 +164,28 @@
             {% endif %}
         </fieldset>
     </form>
+    <h3>Get from remote service (e.g. Flickr)</h3>
+     <form action="{{ oembed_upload_action }}" method="post">{% csrf_token %}
+     <fieldset class="grp-module aligned">
+       
+            {% if form.errors %}<p class="errornote">{% trans 'There was a problem with your information.' %}</p>{% endif %}
+            
+                {% for field in form %}
+                    <div class="grp-row">
+                        <div class="l-2c-fluid l-d-4">
+                    
+                    <div class="c-1">{{ field.label_tag }}</div>
+                    <div class="c-2">{{ field }}<p class="grp-text">{{ field.help_text }}</p>{% if field.errors %}<ul class="errorlist">{{ field.errors }}</ul>{% endif %}</div>
+                    </div>   
+                    </div>
+                {% endfor %}
+ 
+            <div class="grp-row">
+                <input type="submit" value="{% trans 'Get files' %}" class="default" />
+            </div>
+        
+        </div>
+        </fieldset>
+        </form>    
 </div>
 {% endblock %}

@@ -3,6 +3,9 @@
 # PYTHON IMPORTS
 import os
 import re
+import urllib2  
+import logging
+import mimetypes
 from time import gmtime
 from time import strftime
 from time import localtime
@@ -31,7 +34,7 @@ from filebrowser.settings import STRICT_PIL, DIRECTORY, EXTENSIONS, SELECT_FORMA
     NORMALIZE_FILENAME, CONVERT_FILENAME, SEARCH_TRAVERSE, EXCLUDE, VERSIONS, EXTENSION_LIST, DEFAULT_SORTING_BY, DEFAULT_SORTING_ORDER,\
     LIST_PER_PAGE, OVERWRITE_EXISTING, DEFAULT_PERMISSIONS
 from filebrowser.templatetags.fb_tags import query_helper
-from filebrowser.base import FileListing, FileObject
+from filebrowser.base import FileListing, FileObject, OembedInfo
 from filebrowser.decorators import path_exists, file_exists
 from filebrowser.storage import FileSystemStorageMixin, StorageMixin
 from filebrowser.utils import convert_filename, scale_and_crop
@@ -228,14 +231,17 @@ class FileBrowserSite(object):
             url(r'^browse/$', path_exists(self, filebrowser_view(self.browse)), name="fb_browse"),
             url(r'^createdir/', path_exists(self, filebrowser_view(self.createdir)), name="fb_createdir"),
             url(r'^upload/', path_exists(self, filebrowser_view(self.upload)), name="fb_upload"),
+            #url(r'^oembed_upload/', path_exists(self,filebrowser_view(self.oembed_upload)), name="fb_oembed_upload"),
+            #url(r'^oembed_upload_confirm/', path_exists(self,filebrowser_view(self.oembed_upload_confirm)), name="fb_oembed_confirm_upload"),
+            url(r'^oembed_upload_files/$', staff_member_required(csrf_exempt(self._oembed_upload_files)), name="fb_oembed_do_upload"),
+            url(r'^upload_file/$', staff_member_required(csrf_exempt(self._upload_file)), name="fb_do_upload"),
             url(r'^delete_confirm/$', file_exists(self, path_exists(self, filebrowser_view(self.delete_confirm))), name="fb_delete_confirm"),
             url(r'^delete/$', file_exists(self, path_exists(self, filebrowser_view(self.delete))), name="fb_delete"),
             url(r'^detail/$', file_exists(self, path_exists(self, filebrowser_view(self.detail))), name="fb_detail"),
             url(r'^version/$', file_exists(self, path_exists(self, filebrowser_view(self.version))), name="fb_version"),
             url(r'^move/$', file_exists(self, path_exists(self, filebrowser_view(self._moveviews.main))), name="fb_move"),
             url(r'^crop/$', file_exists(self, path_exists(self, filebrowser_view(crop_views.main))), name="fb_crop"),
-            url(r'^upload_file/$', staff_member_required(csrf_exempt(self._upload_file)), name="fb_do_upload"),
-        )
+                   )
         return urlpatterns
 
     def add_action(self, action, name=None):
@@ -289,8 +295,6 @@ class FileBrowserSite(object):
     def urls(self):
         "filebrowser.site URLs"
         return self.get_urls(), self.app_name, self.name
-
-
 
 
     def browse(self, request):
@@ -406,19 +410,100 @@ class FileBrowserSite(object):
             'filebrowser_site': self
         }, context_instance=Context(request, current_app=self.name))
 
-    def upload(self, request):
-        "Multipe File Upload."
-        query = request.GET
+    def _upload_redirect_folder(self,folder):
+        try:
+            if self.storage.use_tag_directories:
+                return self.storage.recent_upload_directory
+        except AttributeError:
+            pass
+        return folder
 
+    def upload(self, request, user_agent="django-filebrowser/0.1"):
+        "Multiple File Upload."
+        from filebrowser.forms import OembedUploadForm
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        query = request.GET
+        folder = self._upload_redirect_folder(query.get('dir', ''))
+        redirect_url=reverse("filebrowser:fb_browse", current_app=self.name) + query_helper(query, "dir=%s"%folder, "ot,o,filter_type,filter_date,q,p")
+        if request.method == 'POST':
+            form = OembedUploadForm(request.POST)
+            if form.is_valid():
+                logging.debug("Valid form")
+                oembed_urls = form.cleaned_data['urls']
+                flnames = form.cleaned_data['name'].split(",")
+
+                successes = []
+                problems = []
+                for url in oembed_urls:
+                    logging.debug("Getting %s"%url)
+                    flname = flnames.pop()
+                    if not flname:
+                        x,flname = os.path.split(url)
+                    logging.debug("Filename %s"%flname)
+                    headers = { 'User-Agent' : user_agent }
+                    urlrequest = urllib2.Request(url, headers=headers)
+                    openfl = urllib2.urlopen(urlrequest)
+                    if openfl.getcode()!=200:
+                        problems.append(url)
+                        continue
+                    (root, ext) = os.path.splitext(flname)
+                    if not ext:
+                        ext = mimetypes.guess_extension(openfl.info().gettype())
+                        if ext==".jpe":
+                            ext = ".jpg"
+                        flname+=ext
+                    fle = SimpleUploadedFile(flname, urllib2.urlopen(urlrequest).read(),openfl.info().gettype())
+                    ret = self._upload_file_result(request, fle)
+                    if not ret['success']:
+                        problems.append(ret['filename'])
+                    else:
+                        successes.append(ret['filename'])
+                    if len(successes):
+                        messages.add_message(request, messages.SUCCESS, _('Successfully got %s') % ", ".join(successes))
+                    if len(problems):
+                        messages.add_message(request, messages.SUCCESS, _('Problem getting %s') % ", ".join(problems))
+                return HttpResponseRedirect(redirect_url)
+        else:
+            form = OembedUploadForm()
+                
+        
+        
+        #oembed_upload_action = reverse("filebrowser:fb_oembed_do_upload", current_app=self.name)  + query_helper(query, "dir=%s"%folder, "ot,o,filter_type,filter_date,q,p")
         return render_to_response('filebrowser/upload.html', {
             'query': query,
             'title': _(u'Select files to upload'),
             'settings_var': get_settings_var(directory=self.directory),
-            'breadcrumbs': get_breadcrumbs(query, query.get('dir', '')),
+            'breadcrumbs': get_breadcrumbs(query, folder),
             'breadcrumbs_title': _(u'Upload'),
-            'filebrowser_site': self
+            'filebrowser_site': self,
+            'redirect_url': redirect_url,
+            'form': form,
+            'oembed_upload_action': ""
         }, context_instance=Context(request, current_app=self.name))
 
+
+    def _oembed_upload_files(self,request,user_agent="django-filebrowser/1.0"):
+        query = request.POST
+        oembed_urls = OembedInfo(query.get('urls','')).oembed_urls
+        headers = { 'User-Agent' : user_agent }
+        problems = []
+        successes = []
+
+        for url in oembed_urls:
+            request = urllib2.Request(url, headers=headers)
+            data = urllib2.urlopen(request).read()
+            ret = self._upload_file_result(request, data)
+            if not ret['success']:
+                problems.append(ret['filename'])
+            else:
+                successes.append(ret['filename'])
+        if len(successes):
+            messages.add_message(request, messages.SUCCESS, _('Successfully got %s') % ", ".join(successes))
+        if len(problems):
+            messages.add_message(request, messages.SUCCESS, _('Problem getting %s') % ", ".join(problems))
+        redirect_url = query.get("redirect_url")
+        return HttpResponseRedirect(redirect_url)
+        
     def delete_confirm(self, request):
         "Delete existing File/Directory."
         query = request.GET
@@ -541,24 +626,36 @@ class FileBrowserSite(object):
             'filebrowser_site': self
         }, context_instance=Context(request, current_app=self.name))
 
-    def _upload_file(self, request):
+    def get_upload_folder(self,request):
+        return request.GET.get('folder', '')
+
+
+
+    def _get_upload_path(self,folder):
+        fb_uploadurl_re = re.compile(r'^.*(%s)' % reverse("filebrowser:fb_upload", current_app=self.name))
+        folder = fb_uploadurl_re.sub('', folder)
+        return os.path.join(self.directory, folder)
+
+    def _upload_file(self,request,filedata=None):
+        return HttpResponse(json.dumps(self._upload_file_result(request,filedata)), content_type="application/json")
+
+    def _upload_file_result(self, request, filedata=None):
         """
         Upload file to the server.
         """
         if request.method == "POST":
-            folder = request.GET.get('folder', '')
 
-            if len(request.FILES) == 0:
-                return HttpResponseBadRequest('Invalid request! No files included.')
-            if len(request.FILES) > 1:
-                return HttpResponseBadRequest('Invalid request! Multiple files included.')
+            folder = self.get_upload_folder(request)
+            if not filedata:
+                if len(request.FILES) == 0:
+                    return HttpResponseBadRequest('Invalid request! No files included.')
+                if len(request.FILES) > 1:
+                    return HttpResponseBadRequest('Invalid request! Multiple files included.')
+                filedata = list(request.FILES.values())[0]
 
-            filedata = list(request.FILES.values())[0]
+            path = self._get_upload_path(folder)
 
-            fb_uploadurl_re = re.compile(r'^.*(%s)' % reverse("filebrowser:fb_upload", current_app=self.name))
-            folder = fb_uploadurl_re.sub('', folder)
 
-            path = os.path.join(self.directory, folder)
             # we convert the filename before uploading in order
             # to check for existing files/folders
             file_name = convert_filename(filedata.name)
@@ -569,7 +666,7 @@ class FileBrowserSite(object):
             # Check for name collision with a directory
             if file_already_exists and self.storage.isdir(file_path):
                 ret_json = {'success': False, 'filename': file_name}
-                return HttpResponse(json.dumps(ret_json))
+                return ret_json
 
             signals.filebrowser_pre_upload.send(sender=request, path=folder, file=filedata, site=self)
             uploadedfile = handle_file_upload(path, filedata, site=self)
@@ -578,11 +675,11 @@ class FileBrowserSite(object):
                 old_file = smart_text(file_path)
                 new_file = smart_text(uploadedfile)
                 self.storage.move(new_file, old_file, allow_overwrite=True)
-                full_path = FileObject(smart_text(old_file), site=self).path_full
+                #full_path = FileObject(smart_text(old_file), site=self).path_full
             else:
                 file_name = smart_text(uploadedfile)
                 filedata.name = os.path.relpath(file_name, path)
-                full_path = FileObject(smart_text(file_name), site=self).path_full
+                #full_path = FileObject(smart_text(file_name), site=self).path_full
 
             # set permissions
             #if DEFAULT_PERMISSIONS is not None:
@@ -590,10 +687,10 @@ class FileBrowserSite(object):
 
             f = FileObject(smart_text(file_name), site=self)
             signals.filebrowser_post_upload.send(sender=request, path=folder, file=f, site=self)
-
             # let Ajax Upload know whether we saved it or not
+        
             ret_json = {'success': True, 'filename': f.filename}
-            return HttpResponse(json.dumps(ret_json), content_type="application/json")
+            return ret_json
 
 storage = DefaultStorage()
 # Default FileBrowser site

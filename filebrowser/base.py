@@ -10,6 +10,8 @@ from tempfile import NamedTemporaryFile
 import warnings
 import logging
 import re
+import urllib2
+import json
 
 # DJANGO IMPORTS
 from django.core.files import File
@@ -34,6 +36,11 @@ else:
         import ImageFile
 
 ImageFile.MAXBLOCK = IMAGE_MAXBLOCK  # default is 64k
+
+# OEMBED IMPORTS
+from oembed.core import re_parts, fetch
+from oembed.models import ProviderRule, StoredOEmbed
+
 
 
 class FileListing():
@@ -103,11 +110,11 @@ class FileListing():
 
     def _if_tag_rel_path(self, path, fle):
         try:
-            if settings.CACHEDS3_LIST_BY_TAG:
+            if self.site.storage.use_tag_directories:
                 return fle
         except AttributeError:
             pass
-        return os.path.join(path,d)
+        return os.path.join(path,fle)
 
     def _walk(self, path, filelisting):
         """
@@ -346,6 +353,7 @@ class FileObject():
     @property
     def url(self):
         "URL for the file/folder as defined with site.storage"
+        logging.debug("I am not a thumbnail: "+self.path)
         if self.is_admin_thumbnail:
             logging.debug("I am a thumbnail: "+self.path)
             callback = lambda x: self._generate_version(ADMIN_THUMBNAIL) 
@@ -522,11 +530,13 @@ class FileObject():
         return os.path.join(self.versions_basedir, self.dirname, self.version_name(version_suffix))
 
     def version_generate(self, version_suffix):
+        logging.debug("Generate version %s"%version_suffix)
         "Generate a version"  # FIXME: version_generate for version?
         path = self.path
         if not path:
             raise IOError("Empty path")
         version_path = self.version_path(version_suffix)
+        logging.debug("Generate version %s"%version_path)
         if not self.site.storage.isfile(version_path):
             version_path = self._generate_version(version_suffix)
         elif self.site.storage.modified_time(path) > self.site.storage.modified_time(version_path):
@@ -538,7 +548,7 @@ class FileObject():
         Generate Version for an Image.
         value has to be a path relative to the storage location.
         """
-
+        logging.debug("Creating version file %s"%version_suffix)
         tmpfile = File(NamedTemporaryFile())
 
         try:
@@ -565,10 +575,8 @@ class FileObject():
         # remove old version, if any
         if version_path != self.site.storage.get_available_name(version_path):
             self.site.storage.delete(version_path)
-        if version_suffix==ADMIN_THUMBNAIL:
-            self.site.storage.save(version_path, tmpfile, thumbnail=True)
-        else:
-            self.site.storage.save(version_path, tmpfile)
+        self.site.storage.save(version_path, tmpfile)
+
         # set permissions
         #if DEFAULT_PERMISSIONS is not None:
         #    os.chmod(self.site.storage.path(version_path), DEFAULT_PERMISSIONS)
@@ -601,3 +609,56 @@ class FileObject():
                 self.site.storage.delete(version)
             except:
                 pass
+
+
+
+class OembedInfo():
+    def __init__(self, text, site=None):
+        if not site:
+            from filebrowser.sites import site as default_site
+            site = default_site
+        self.site = site
+        self.text = text
+
+    @property
+    def rules(self):
+        try:
+            return self._rules
+        except AttributeError:
+            self._rules = list(ProviderRule.objects.all())
+            return self._rules
+    @property
+    def regex_patterns(self):
+        try:
+            return self._regex_patterns
+        except AttributeError:
+            self._regex_patterns = [re.compile(r.regex+"(?![^<\s+]*\w*<\/a>)") for r in self.rules] 
+            return self._regex_patterns
+
+    @property
+    def oembed_urls(self):
+        try:
+            return self._oembed_urls
+        except AttributeError:
+            self._oembed_urls= [u"%s?format=json&url=%s"%(self.rules[i].endpoint,part) for i,part in re_parts(self.regex_patterns, self.text) if i!=-1]
+            return self._oembed_urls
+
+    def _gen_download_info(self):
+        for url in self.oembed_urls:
+            oembed = json.loads(fetch(url))
+            yield oembed
+
+    @property
+    def download_info(self):
+        try:
+            return self._download_info
+        except AttributeError:
+            self._download_info = self._gen_download_info()
+            return self._download_info
+
+    @property
+    def download_urls(self):
+        #try:
+        return [obj['url'] for obj in self.download_info]
+        #except TypeError:
+        #    return False

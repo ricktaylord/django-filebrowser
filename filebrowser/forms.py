@@ -11,6 +11,7 @@ from django.utils.translation import ugettext_lazy as _
 # FILEBROWSER IMPORTS
 from filebrowser.settings import FOLDER_REGEX
 from filebrowser.utils import convert_filename
+from filebrowser.base import OembedInfo
 
 ALNUM_NAME_RE = re.compile(FOLDER_REGEX, re.U)
 
@@ -82,4 +83,26 @@ class ChangeForm(forms.Form):
                 raise forms.ValidationError(_(u'The File already exists.'))
         return convert_filename(self.cleaned_data['name'])
 
+class OembedUploadForm(forms.Form):
+    """
+    Form for getting files from Oembed services
+    """
+    urls = forms.CharField(widget=forms.TextInput(), label=_(u'URL(s) of file(s)'), help_text=_(u'Paste a URL (web address) or multiple URLs for files, from service that support OEmbed (e.g. Flickr)'), required=True)
+    name = forms.CharField(widget=forms.TextInput(attrs=dict({'class': 'vTextField'}, max_length=50, min_length=3)), label=_(u'Name'), help_text=_(u'Only letters, numbers, underscores, spaces and hyphens are allowed.'), required=False)
+
+
+    def clean_urls(self):
+        "validate urls"
+        if self.cleaned_data['urls']:
+            urls = OembedInfo(self.cleaned_data['urls']).download_urls
+            if not len(urls):
+                raise forms.ValidationError(_(u'No downloadable URLs were recognised.  Make sure the service you are using supports oembed and has been added to the ProviderRules on this site.'))
+            return urls
+    def clean_name(self):
+        "validate name"
+        if self.cleaned_data['name']:
+            # only letters, numbers, underscores, spaces and hyphens are allowed.
+            if not ALNUM_NAME_RE.search(self.cleaned_data['name']):
+                raise forms.ValidationError(_(u'Only letters, numbers, underscores, spaces and hyphens are allowed.'))
+        return convert_filename(self.cleaned_data['name'])
 
