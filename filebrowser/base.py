@@ -42,7 +42,6 @@ from oembed.core import re_parts, fetch
 from oembed.models import ProviderRule, StoredOEmbed
 
 
-
 class FileListing():
     """
     The FileListing represents a group of FileObjects/FileDirObjects.
@@ -95,6 +94,7 @@ class FileListing():
         return sorted(seq, key=attrgetter(*attr))
 
     _is_folder_stored = None
+
     @property
     def is_folder(self):
         if self._is_folder_stored is None:
@@ -109,12 +109,14 @@ class FileListing():
         return []
 
     def _if_tag_rel_path(self, path, fle):
+        logging.debug("Chcking whether to show as rel path %s" % fle)
         try:
             if self.site.storage.use_tag_directories:
+                logging.debug("Showing")
                 return fle
         except AttributeError:
             pass
-        return os.path.join(path,fle)
+        return os.path.join(path, fle)
 
     def _walk(self, path, filelisting):
         """
@@ -129,11 +131,13 @@ class FileListing():
         if dirs:
             for d in dirs:
                 self._walk(os.path.join(path, d), filelisting)
-                filelisting.extend([path_strip(self._if_tag_rel_path(path, d), self.site.directory)])
+                filelisting.extend(
+                    [path_strip(self._if_tag_rel_path(path, d), self.site.directory)])
 
         if files:
             for f in files:
-                filelisting.extend([path_strip(self._if_tag_rel_path(path, f), self.site.directory)])
+                filelisting.extend(
+                    [path_strip(self._if_tag_rel_path(path, f), self.site.directory)])
 
     def walk(self):
         "Walk all files for path"
@@ -142,7 +146,8 @@ class FileListing():
             self._walk(self.path, filelisting)
         return filelisting
 
-    # Cached results of files_listing_total (without any filters and sorting applied)
+    # Cached results of files_listing_total (without any filters and sorting
+    # applied)
     _fileobjects_total = None
 
     def files_listing_total(self):
@@ -150,7 +155,8 @@ class FileListing():
         if self._fileobjects_total is None:
             self._fileobjects_total = []
             for item in self.listing():
-                fileobject = FileObject(self._if_tag_rel_path(self.path, item), site=self.site)
+                fileobject = FileObject(
+                    self._if_tag_rel_path(self.path, item), site=self.site)
                 self._fileobjects_total.append(fileobject)
 
         files = self._fileobjects_total
@@ -167,7 +173,8 @@ class FileListing():
         "Returns FileObjects for all files in walk"
         files = []
         for item in self.walk():
-            fileobject = FileObject(os.path.join(self.site.directory, item), site=self.site)
+            fileobject = FileObject(
+                os.path.join(self.site.directory, item), site=self.site)
             files.append(fileobject)
         if self.sorting_by:
             files = self.sort_by_attr(files, self.sorting_by)
@@ -179,7 +186,8 @@ class FileListing():
     def files_listing_filtered(self):
         "Returns FileObjects for filtered files in listing"
         if self.filter_func:
-            listing = list(filter(self.filter_func, self.files_listing_total()))
+            listing = list(
+                filter(self.filter_func, self.files_listing_total()))
         else:
             listing = self.files_listing_total()
         self._results_listing_filtered = len(listing)
@@ -280,6 +288,7 @@ class FileObject():
     # exists
 
     _filetype_stored = None
+
     @property
     def filetype(self):
         "Filetype as defined with EXTENSIONS"
@@ -292,6 +301,7 @@ class FileObject():
         return self._filetype_stored
 
     _filesize_stored = None
+
     @property
     def filesize(self):
         "Filesize in bytes"
@@ -303,13 +313,15 @@ class FileObject():
         return None
 
     _date_stored = None
+
     @property
     def date(self):
         "Modified time (from site.storage) as float (mktime)"
         if self._date_stored is not None:
             return self._date_stored
         if self.exists:
-            self._date_stored = time.mktime(self.site.storage.modified_time(self.path).timetuple())
+            self._date_stored = time.mktime(
+                self.site.storage.modified_time(self.path).timetuple())
             return self._date_stored
         return None
 
@@ -321,6 +333,7 @@ class FileObject():
         return None
 
     _exists_stored = None
+
     @property
     def exists(self):
         "True, if the path exists, False otherwise"
@@ -353,11 +366,11 @@ class FileObject():
     @property
     def url(self):
         "URL for the file/folder as defined with site.storage"
-        logging.debug("I am not a thumbnail: "+self.path)
+        logging.debug("I am not a thumbnail: " + self.path)
         if self.is_admin_thumbnail:
-            logging.debug("I am a thumbnail: "+self.path)
-            callback = lambda x: self._generate_version(ADMIN_THUMBNAIL) 
-            return self.site.storage.thumbnail_cache_url(self.path,callback)            
+            logging.debug("I am a thumbnail: " + self.path)
+            callback = lambda x: self._generate_version(ADMIN_THUMBNAIL)
+            return self.site.storage.thumbnail_cache_url(self.path, callback)
         return self.site.storage.url(self.path)
 
     # IMAGE ATTRIBUTES/PROPERTIES
@@ -368,6 +381,7 @@ class FileObject():
     # orientation
 
     _dimensions_stored = None
+
     @property
     def dimensions(self):
         "Image dimensions as a tuple"
@@ -424,16 +438,21 @@ class FileObject():
     @property
     def directory(self):
         "Folder(s) relative from site.directory"
-        warnings.warn("directory will be removed with 3.6, use path_relative_directory instead.", DeprecationWarning)
+        warnings.warn(
+            "directory will be removed with 3.6, use path_relative_directory instead.", DeprecationWarning)
         return path_strip(self.path, self.site.directory)
 
     @property
     def folder(self):
         "Parent folder(s)"
-        warnings.warn("directory will be removed with 3.6, use dirname instead.", DeprecationWarning)
-        return os.path.dirname(path_strip(os.path.join(self.head, ''), self.site.directory))
+        warnings.warn(
+            "directory will be removed with 3.6, use dirname instead.", DeprecationWarning)
+        return os.path.dirname(
+            path_strip(os.path.join(self.head, ''),
+                       self.site.directory))
 
     _is_folder_stored = None
+
     @property
     def is_folder(self):
         "True, if path is a folder"
@@ -449,7 +468,6 @@ class FileObject():
             if not dirs and not files:
                 return True
         return False
-
 
     # VERSION ATTRIBUTES/PROPERTIES
     # is_version
@@ -486,8 +504,12 @@ class FileObject():
     def original(self):
         "Returns the original FileObject"
         if self.is_version:
-            relative_path = self.head.replace(self.versions_basedir, "").lstrip("/")
-            return FileObject(os.path.join(self.site.directory, relative_path, self.original_filename), site=self.site)
+            relative_path = self.head.replace(
+                self.versions_basedir, "").lstrip("/")
+            return FileObject(os.path.join(self.site.directory,
+                                           relative_path,
+                                           self.original_filename),
+                              site=self.site)
         return self
 
     @property
@@ -510,7 +532,8 @@ class FileObject():
         version_list = []
         if self.filetype == "Image" and not self.is_version:
             for version in sorted(VERSIONS):
-                version_list.append(os.path.join(self.versions_basedir, self.dirname, self.version_name(version)))
+                version_list.append(
+                    os.path.join(self.versions_basedir, self.dirname, self.version_name(version)))
         return version_list
 
     def admin_versions(self):
@@ -518,7 +541,8 @@ class FileObject():
         version_list = []
         if self.filetype == "Image" and not self.is_version:
             for version in ADMIN_VERSIONS:
-                version_list.append(os.path.join(self.versions_basedir, self.dirname, self.version_name(version)))
+                version_list.append(
+                    os.path.join(self.versions_basedir, self.dirname, self.version_name(version)))
         return version_list
 
     def version_name(self, version_suffix):
@@ -526,29 +550,30 @@ class FileObject():
         return self.filename_root + "_" + version_suffix + self.extension
 
     def version_path(self, version_suffix):
-        "Path to a version (relative to storage location)"  # FIXME: version_path for version?
+        # FIXME: version_path for version?
+        "Path to a version (relative to storage location)"
         return os.path.join(self.versions_basedir, self.dirname, self.version_name(version_suffix))
 
     def version_generate(self, version_suffix):
-        logging.debug("Generate version %s"%version_suffix)
+        logging.debug("Generate version %s" % version_suffix)
         "Generate a version"  # FIXME: version_generate for version?
         path = self.path
         if not path:
             raise IOError("Empty path")
         version_path = self.version_path(version_suffix)
-        logging.debug("Generate version %s"%version_path)
+        logging.debug("Generate version %s" % version_path)
         if not self.site.storage.isfile(version_path):
             version_path = self._generate_version(version_suffix)
         elif self.site.storage.modified_time(path) > self.site.storage.modified_time(version_path):
             version_path = self._generate_version(version_suffix)
         return FileObject(version_path, site=self.site)
 
-    def _generate_version(self, version_suffix):    
+    def _generate_version(self, version_suffix):
         """
         Generate Version for an Image.
         value has to be a path relative to the storage location.
         """
-        logging.debug("Creating version file %s"%version_suffix)
+        logging.debug("Creating version file %s" % version_suffix)
         tmpfile = File(NamedTemporaryFile())
 
         try:
@@ -559,7 +584,8 @@ class FileObject():
         version_path = self.version_path(version_suffix)
         version_dir, version_basename = os.path.split(version_path)
         root, ext = os.path.splitext(version_basename)
-        version = scale_and_crop(im, VERSIONS[version_suffix]['width'], VERSIONS[version_suffix]['height'], VERSIONS[version_suffix]['opts'])
+        version = scale_and_crop(im, VERSIONS[version_suffix]['width'], VERSIONS[
+                                 version_suffix]['height'], VERSIONS[version_suffix]['opts'])
         if not version:
             version = im
         # version methods as defined with VERSIONS
@@ -569,16 +595,18 @@ class FileObject():
                     version = m(version)
         # save version
         try:
-            version.save(tmpfile, format=Image.EXTENSION[ext.lower()], quality=VERSION_QUALITY, optimize=(os.path.splitext(version_path)[1] != '.gif'))
+            version.save(tmpfile, format=Image.EXTENSION[ext.lower(
+            )], quality=VERSION_QUALITY, optimize=(os.path.splitext(version_path)[1] != '.gif'))
         except IOError:
-            version.save(tmpfile, format=Image.EXTENSION[ext.lower()], quality=VERSION_QUALITY)
+            version.save(
+                tmpfile, format=Image.EXTENSION[ext.lower()], quality=VERSION_QUALITY)
         # remove old version, if any
         if version_path != self.site.storage.get_available_name(version_path):
             self.site.storage.delete(version_path)
-        self.site.storage.save(version_path, tmpfile)
+        self.site.storage.save(version_path, tmpfile, original=False)
 
         # set permissions
-        #if DEFAULT_PERMISSIONS is not None:
+        # if DEFAULT_PERMISSIONS is not None:
         #    os.chmod(self.site.storage.path(version_path), DEFAULT_PERMISSIONS)
         return version_path
 
@@ -611,7 +639,6 @@ class FileObject():
                 pass
 
 
-
 class OembedInfo():
     def __init__(self, text, site=None):
         if not site:
@@ -627,12 +654,14 @@ class OembedInfo():
         except AttributeError:
             self._rules = list(ProviderRule.objects.all())
             return self._rules
+
     @property
     def regex_patterns(self):
         try:
             return self._regex_patterns
         except AttributeError:
-            self._regex_patterns = [re.compile(r.regex+"(?![^<\s+]*\w*<\/a>)") for r in self.rules] 
+            self._regex_patterns = [
+                re.compile(r.regex + "(?![^<\s+]*\w*<\/a>)") for r in self.rules]
             return self._regex_patterns
 
     @property
@@ -640,7 +669,8 @@ class OembedInfo():
         try:
             return self._oembed_urls
         except AttributeError:
-            self._oembed_urls= [u"%s?format=json&url=%s"%(self.rules[i].endpoint,part) for i,part in re_parts(self.regex_patterns, self.text) if i!=-1]
+            self._oembed_urls = [u"%s?format=json&url=%s" % (
+                self.rules[i].endpoint, part) for i, part in re_parts(self.regex_patterns, self.text) if i != -1]
             return self._oembed_urls
 
     def _gen_download_info(self):
@@ -658,7 +688,7 @@ class OembedInfo():
 
     @property
     def download_urls(self):
-        #try:
+        # try:
         return [obj['url'] for obj in self.download_info]
-        #except TypeError:
+        # except TypeError:
         #    return False

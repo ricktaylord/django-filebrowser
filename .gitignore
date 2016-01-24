@@ -5,3 +5,4 @@ dist
 *.pot
 .DS_store
 fabfile.py
+*sublime-workspace
