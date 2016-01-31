@@ -8,6 +8,7 @@ import re
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.utils.six.moves import input
+from filebrowser.sites import site
 
 # FILEBROWSER IMPORTS
 from filebrowser.settings import EXTENSION_LIST, EXCLUDE, DIRECTORY, VERSIONS, EXTENSIONS
