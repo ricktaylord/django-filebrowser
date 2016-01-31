@@ -44,8 +44,7 @@ class Command(BaseCommand):
         # FIXME filterfunc: no hidden files, exclude list, no versions, just
         # images!
         paths = [k for k,v in site.storage.entries.iteritems() if self.filter_images(v)]
-        print paths
-
+        
         site.storage.batch_set_original(paths)
 
     def filter_images(self, item):
