@@ -61,8 +61,9 @@ class Command(BaseCommand):
                     continue
 
         # filelisting
-        filelisting = FileListing(path, filter_func=self.filter_images)  # FIXME filterfunc: no hidden files, exclude list, no versions, just images!
-        for fileobject in filelisting.files_walk_filtered():
+        #filelisting = FileListing(path, filter_func=self.filter_images)  # FIXME filterfunc: no hidden files, exclude list, no versions, just images!
+        for pth,fl in site.storage.entries.iteritems():
+            fileobject = FileObject(pth)
             if fileobject.filetype == "Image":
                 if selected_version:
                     self.stdout.write('generating version "%s" for: %s\n' % (selected_version, fileobject.path))

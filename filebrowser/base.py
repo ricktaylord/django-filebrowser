@@ -126,6 +126,7 @@ class FileListing():
         Danger: Symbolic links can create cycles and this function
         ends up in a regression.
         """
+        print self.site.storage.listdir(path)
         dirs, files = self.site.storage.listdir(path)
 
         if dirs:
@@ -603,7 +604,9 @@ class FileObject():
         # remove old version, if any
         if version_path != self.site.storage.get_available_name(version_path):
             self.site.storage.delete(version_path)
-        self.site.storage.save(version_path, tmpfile, original=False)
+        self.site.storage.working_on_original=False
+        self.site.storage.save(version_path, tmpfile)
+        self.site.storage.working_on_original=True
 
         # set permissions
         # if DEFAULT_PERMISSIONS is not None:
